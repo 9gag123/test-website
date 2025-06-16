@@ -1,0 +1,400 @@
+
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Dual Spinner Activity</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      text-align: center;
+      background-color: #f8f9fa;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      overflow: hidden;
+      height: 100vh;
+    }
+    .main-container {
+      width: 100%;
+      max-width: 800px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding-top: 10px;
+    }
+    .wheel-container {
+      display: flex;
+      justify-content: center;
+      gap: 1.2rem;
+      flex-wrap: wrap;
+      margin-bottom: 0.8rem;
+    }
+    .wheel-wrapper {
+      position: relative;
+    }
+    canvas#wheel1, canvas#wheel2 {
+      background: white;
+      border-radius: 50%;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+      border: 3px solid #222160;
+      transition: transform 0.3s ease;
+      width: 260px;
+      height: 260px;
+    }
+    canvas#confetti-canvas {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: 100;
+      transition: opacity 1s ease-out;
+    }
+    .marker {
+      width: 0;
+      height: 0;
+      border-left: 12px solid transparent;
+      border-right: 12px solid transparent;
+      border-top: 20px solid #ff006e;
+      position: absolute;
+      top: -15px;
+      left: calc(50% - 12px);
+      z-index: 10;
+      filter: drop-shadow(0 2px 2px rgba(0,0,0,0.2));
+    }
+    button {
+      padding: 0.5rem 1.5rem;
+      font-size: 1.1rem;
+      background: #fac800;
+      color: #000000;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+      margin-bottom: 10px;
+    }
+    button:hover {
+      background: #fcd94d;
+      transform: translateY(-2px);
+      box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+    }
+    button:active {
+      transform: translateY(0);
+    }
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background-color: rgba(0, 0, 0, 0.4);
+      z-index: 1000;
+      justify-content: center;
+      align-items: center;
+      animation: fadeIn 0.3s ease-out;
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+    #result-box {
+      background: white;
+      padding: 1rem 1.5rem;
+      box-shadow: 0 0 25px rgba(0,0,0,0.25);
+      border-radius: 12px;
+      font-size: 1.5rem;
+      font-weight: bold;
+      color: #222160;
+      max-width: 500px;
+      min-width: 280px;
+      animation: popIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+      position: relative;
+      text-align: center;
+    }
+    .close-button {
+      position: absolute;
+      top: 5px;
+      right: 10px;
+      font-size: 1.5rem;
+      line-height: 1;
+      cursor: pointer;
+      color: #999;
+      transition: color 0.2s;
+    }
+    .close-button:hover {
+      color: #333;
+    }
+    @keyframes popIn {
+      0% { transform: scale(0.5); opacity: 0; }
+      100% { transform: scale(1); opacity: 1; }
+    }
+  </style>
+</head>
+<body>
+  <div class="main-container">
+    <canvas id="confetti-canvas"></canvas>
+
+    <div class="wheel-container">
+      <div class="wheel-wrapper">
+        <div class="marker"></div>
+        <canvas id="wheel1" width="260" height="260"></canvas>
+      </div>
+      <div class="wheel-wrapper">
+        <div class="marker"></div>
+        <canvas id="wheel2" width="260" height="260"></canvas>
+      </div>
+    </div>
+    <button onclick="spinBoth()">Spin Both Wheels</button>
+  </div>
+
+  <div class="modal-overlay" id="result-modal">
+    <div id="result-box">
+      <span class="close-button" onclick="closeResult()">×</span>
+      <div id="result-content"></div>
+    </div>
+  </div>
+
+  <script>
+    let items1 = ["TikTok", "Shopee", "Uniqlo", "Zalo", "Tinder", "Netflix", "Linkedin","Walt Disney","Microsoft","Adobe","Coca Cola","Vinamilk","Airbnb","Grab"];
+    let items2 = ["Ads", "Transaction fee","Subscription", "Pay per use", "Freemium", "Commission-based", "Unit-based","Licensing"];
+
+    const wheel1Canvas = document.getElementById("wheel1");
+    const wheel2Canvas = document.getElementById("wheel2");
+    const ctx1 = wheel1Canvas.getContext("2d");
+    const ctx2 = wheel2Canvas.getContext("2d");
+    
+    const resultModal = document.getElementById("result-modal");
+    
+    // Define two main colors - dark blue and darker gold
+    const color1 = "#222160"; // Dark blue
+    const color2 = "#646490"; // Darker shade of gold (slightly darker than #fac800 for better contrast)
+
+    function drawWheel(ctx, items) {
+      const numItems = items.length;
+      const angle = (2 * Math.PI) / numItems;
+      const canvasSize = ctx.canvas.width;
+      const center = canvasSize / 2;
+      const radius = center - 10;
+      
+      ctx.clearRect(0, 0, canvasSize, canvasSize);
+
+      // Draw segments with alternating colors
+      items.forEach((item, i) => {
+        const start = i * angle;
+        const end = start + angle;
+        ctx.beginPath();
+        ctx.moveTo(center, center);
+        ctx.arc(center, center, radius, start, end);
+        // Alternate between the two colors
+        ctx.fillStyle = i % 2 === 0 ? color1 : color2;
+        ctx.fill();
+        ctx.lineWidth = 1;
+        ctx.strokeStyle = "white";
+        ctx.stroke();
+
+        // Draw text with improved visibility
+        ctx.save();
+        ctx.translate(center, center);
+        ctx.rotate(start + angle / 2);
+        ctx.textAlign = "right";
+        ctx.fillStyle = "white";
+        ctx.font = "bold 14px sans-serif";
+        ctx.shadowColor = "rgba(0,0,0,0.5)";
+        ctx.shadowBlur = 3;
+        ctx.fillText(item, radius - 15, 6);
+        ctx.restore();
+      });
+
+      // Draw center circle
+      ctx.beginPath();
+      ctx.arc(center, center, 15, 0, 2 * Math.PI);
+      ctx.fillStyle = color1;
+      ctx.fill();
+      ctx.strokeStyle = "white";
+      ctx.lineWidth = 2;
+      ctx.stroke();
+    }
+
+    function animateSpin(ctx, items, callback) {
+      const spins = 5;
+      const segmentAngle = (2 * Math.PI) / items.length;
+      const targetIndex = Math.floor(Math.random() * items.length);
+      const targetAngle = (Math.PI * 3 / 2) - (targetIndex * segmentAngle) - segmentAngle / 2;
+      const totalRotation = (2 * Math.PI * spins) + targetAngle;
+      const duration = 3000;
+      const startTime = performance.now();
+      const canvasSize = ctx.canvas.width;
+
+      function rotate(time) {
+        const elapsed = time - startTime;
+        const t = Math.min(elapsed / duration, 1);
+        const ease = 1 - Math.pow(1 - t, 4); // Smoother easing
+        const angle = ease * totalRotation;
+
+        ctx.save();
+        ctx.clearRect(0, 0, canvasSize, canvasSize);
+        ctx.translate(canvasSize/2, canvasSize/2);
+        ctx.rotate(angle);
+        ctx.translate(-canvasSize/2, -canvasSize/2);
+        drawWheel(ctx, items);
+        ctx.restore();
+
+        if (t < 1) {
+          requestAnimationFrame(rotate);
+        } else {
+          callback(items[targetIndex]);
+        }
+      }
+      requestAnimationFrame(rotate);
+    }
+
+    function spinBoth() {
+      let result1 = null;
+      let result2 = null;
+      
+      // Disable button during spin
+      const spinButton = document.querySelector('button');
+      spinButton.disabled = true;
+      spinButton.style.opacity = "0.7";
+      
+      // Close any existing result modal
+      closeResult();
+      
+      animateSpin(ctx1, items1, (res) => {
+        result1 = res;
+        if (result2 !== null) {
+          displayResult(result1, result2);
+          spinButton.disabled = false;
+          spinButton.style.opacity = "1";
+        }
+      });
+      
+      animateSpin(ctx2, items2, (res) => {
+        result2 = res;
+        if (result1 !== null) {
+          displayResult(result1, result2);
+          spinButton.disabled = false;
+          spinButton.style.opacity = "1";
+        }
+      });
+    }
+
+    function displayResult(item1, item2) {
+      const resultContent = document.getElementById("result-content");
+      resultContent.innerHTML = `🎉 Result: ${item1} - ${item2} 🎉`;
+      
+      // Show modal
+      resultModal.style.display = "flex";
+      
+      // Start confetti effect
+      startConfetti();
+    }
+    
+    function closeResult() {
+      resultModal.style.display = "none";
+    }
+
+    function startConfetti() {
+      const canvas = document.getElementById('confetti-canvas');
+      const ctx = canvas.getContext('2d');
+      canvas.style.opacity = '1';
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+      const particles = [];
+      const particleCount = 100;
+      // Updated confetti colors to match the new theme
+      const colors = [color1, color2, '#ff006e', '#ffffff'];
+
+      for (let i = 0; i < particleCount; i++) {
+        particles.push({
+          x: Math.random() * canvas.width,
+          y: Math.random() * canvas.height - canvas.height,
+          color: colors[Math.floor(Math.random() * colors.length)],
+          size: Math.random() * 6 + 2,
+          speed: Math.random() * 2 + 1,
+          angle: Math.random() * 360,
+          rotation: Math.random() * 360,
+          rotationSpeed: Math.random() * 4 - 2
+        });
+      }
+
+      let animationId;
+      function animate() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        let stillFalling = false;
+        particles.forEach(p => {
+          ctx.save();
+          ctx.translate(p.x, p.y);
+          ctx.rotate(p.rotation * Math.PI / 180);
+          ctx.fillStyle = p.color;
+          ctx.fillRect(-p.size / 2, -p.size / 2, p.size, p.size);
+          ctx.restore();
+
+          p.y += p.speed;
+          p.rotation += p.rotationSpeed;
+          if (p.y < canvas.height) stillFalling = true;
+        });
+
+        if (stillFalling) {
+          animationId = requestAnimationFrame(animate);
+        } else {
+          fadeOutConfetti();
+        }
+      }
+
+      animate();
+
+      function fadeOutConfetti() {
+        canvas.style.opacity = '1';
+        setTimeout(() => {
+          canvas.style.opacity = '0';
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+          cancelAnimationFrame(animationId);
+        }, 1000);
+      }
+    }
+
+    // Allow clicking outside the modal to close it
+    resultModal.addEventListener('click', function(event) {
+      if (event.target === resultModal) {
+        closeResult();
+      }
+    });
+
+    // Allow pressing Escape key to close the modal
+    document.addEventListener('keydown', function(event) {
+      if (event.key === 'Escape' && resultModal.style.display === 'flex') {
+        closeResult();
+      }
+    });
+
+    // Notify parent frame of our height
+    function notifyHeight() {
+      if (window.parent) {
+        const height = document.body.scrollHeight;
+        window.parent.postMessage({ height }, '*');
+      }
+    }
+
+    // Initial draw
+    drawWheel(ctx1, items1);
+    drawWheel(ctx2, items2);
+    
+    // Add resize handler
+    window.addEventListener('resize', function() {
+      notifyHeight();
+    });
+    
+    // Notify height when loaded
+    window.addEventListener('load', function() {
+      notifyHeight();
+    });
+  </script>
+</body>
+</html>
